@@ -12,6 +12,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,17 +23,22 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.pm.PackageInfoCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.style.TextAlign
@@ -63,24 +69,31 @@ private sealed interface Screen {
     data object Overview : Screen
     data class Day(val date: LocalDate) : Screen
     data class Edit(val entry: Entry?, val slot: Slot?, val day: LocalDate?, val returnTo: Screen) : Screen
+    data class Symptom(val entry: Entry?, val day: LocalDate?, val returnTo: Screen) : Screen
     data object Settings : Screen
     data object Data : Screen
 }
 
 private val dayHeaderFormat = DateTimeFormatter.ofPattern("EEEE, d. MMMM yyyy", Locale.GERMAN)
-private val dayShortFormat = DateTimeFormatter.ofPattern("EEEE, d. MMM", Locale.GERMAN)
+internal val dayShortFormat = DateTimeFormatter.ofPattern("EEEE, d. MMM", Locale.GERMAN)
 private val dateTimeFormat = DateTimeFormatter.ofPattern("dd.MM. HH:mm")
 private val timeFormat = DateTimeFormatter.ofPattern("HH:mm")
 
-private fun Long.toTime(): String =
+internal fun Long.toTime(): String =
     Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).format(timeFormat)
 
 private fun Long.toDateTime(): String =
     Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).format(dateTimeFormat)
 
+/** Versionszeile, z. B. „Version 0.2.0 (Build 7)". Die Build-Nummer zählt GitHub Actions hoch. */
+private fun appVersionLabel(context: Context): String {
+    val info = context.packageManager.getPackageInfo(context.packageName, 0)
+    return "Version ${info.versionName} (Build ${PackageInfoCompat.getLongVersionCode(info)})"
+}
+
 private fun formatMinutes(minutes: Int): String = "%02d:%02d".format(minutes / 60, minutes % 60)
 
-private fun defaultEatenAt(day: LocalDate?): Long {
+internal fun defaultEatenAt(day: LocalDate?): Long {
     val target = day ?: LocalDate.now()
     return if (target == LocalDate.now()) System.currentTimeMillis()
     else target.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -96,7 +109,7 @@ private fun pickMinutes(context: Context, current: Int, onPicked: (Int) -> Unit)
     ).show()
 }
 
-private fun pickDateTime(context: Context, base: Long, onPicked: (Long) -> Unit) {
+internal fun pickDateTime(context: Context, base: Long, onPicked: (Long) -> Unit) {
     val cal = java.util.Calendar.getInstance().apply { timeInMillis = base }
     TimePickerDialog(
         context,
@@ -140,14 +153,26 @@ fun FoodiaryApp(
         }
     }
 
+    // Einträge ohne Mahlzeit sind Beschwerden und öffnen ihren eigenen Bildschirm.
+    fun editorFor(entry: Entry, day: LocalDate?, back: Screen): Screen =
+        if (entry.mealType == null) Screen.Symptom(entry, day, back) else Screen.Edit(entry, null, day, back)
+
     BackHandler(enabled = screen != Screen.Overview && screen != Screen.Welcome) {
         screen = when (val s = screen) {
             is Screen.Edit -> s.returnTo
+            is Screen.Symptom -> s.returnTo
             else -> Screen.Overview
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    // Android 15 zeichnet Apps randlos. Ohne diese Abstände rutscht Inhalt unter Status- und Navigationsleiste.
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .then(if (screen == Screen.Welcome) Modifier else Modifier.safeDrawingPadding()),
+        color = MaterialTheme.colorScheme.background
+    ) {
         when (val current = screen) {
             Screen.Welcome -> WelcomeScreen(onDone = {
                 appPrefs.welcomeDone = true
@@ -160,9 +185,10 @@ fun FoodiaryApp(
                 onCalendarModeChange = { calendarMode = it },
                 calendarMonth = YearMonth.parse(calendarMonthText),
                 onCalendarMonthChange = { calendarMonthText = it.toString() },
-                onAdd = { screen = Screen.Edit(null, null, null, Screen.Overview) },
+                onAddMeal = { screen = Screen.Edit(null, null, null, Screen.Overview) },
+                onAddSymptom = { screen = Screen.Symptom(null, null, Screen.Overview) },
                 onOpenDay = { screen = Screen.Day(it) },
-                onEdit = { screen = Screen.Edit(it, null, null, Screen.Overview) },
+                onEdit = { screen = editorFor(it, null, Screen.Overview) },
                 onData = { screen = Screen.Data },
                 onSettings = { screen = Screen.Settings }
             )
@@ -173,14 +199,22 @@ fun FoodiaryApp(
                     .filter { it.dayDate() == current.date }
                     .sortedBy { it.eatenAt ?: it.recordedAt },
                 onBack = { screen = Screen.Overview },
-                onEdit = { screen = Screen.Edit(it, null, current.date, current) },
-                onAdd = { screen = Screen.Edit(null, null, current.date, current) }
+                onEdit = { screen = editorFor(it, current.date, current) },
+                onAddMeal = { screen = Screen.Edit(null, null, current.date, current) },
+                onAddSymptom = { screen = Screen.Symptom(null, current.date, current) }
             )
 
             is Screen.Edit -> EditScreen(
                 dao = dao,
                 existing = current.entry,
                 slot = current.slot,
+                day = current.day,
+                onClose = { screen = current.returnTo }
+            )
+
+            is Screen.Symptom -> SymptomScreen(
+                dao = dao,
+                existing = current.entry,
                 day = current.day,
                 onClose = { screen = current.returnTo }
             )
@@ -202,6 +236,7 @@ private fun WelcomeScreen(onDone: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(Palette.Lavender, Palette.Peach)))
+            .safeDrawingPadding()
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -210,7 +245,7 @@ private fun WelcomeScreen(onDone: () -> Unit) {
         Spacer(Modifier.height(24.dp))
         Surface(color = Palette.Surface200, shape = RoundedCornerShape(50)) {
             Text(
-                "FooDiary",
+                "Bekömmlich",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                 style = MaterialTheme.typography.labelLarge
             )
@@ -221,7 +256,7 @@ private fun WelcomeScreen(onDone: () -> Unit) {
             colors = CardDefaults.cardColors(containerColor = Palette.Surface200)
         ) {
             Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Willkommen bei FooDiary", style = MaterialTheme.typography.headlineSmall)
+                Text("Willkommen bei Bekömmlich", style = MaterialTheme.typography.headlineSmall)
                 Text(
                     "Notiere, was du isst und wie es dir danach geht. Mit der Zeit siehst du Muster, " +
                         "zum Beispiel bei vermuteten Unverträglichkeiten.",
@@ -232,7 +267,7 @@ private fun WelcomeScreen(onDone: () -> Unit) {
                     "Damit dich die Erinnerungen zu deinen Mahlzeiten erreichen, brauchen wir die Erlaubnis für Benachrichtigungen.",
                     style = MaterialTheme.typography.bodyMedium
                 )
-                Button(
+                Button(colors = peachButtonColors(), 
                     onClick = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -255,13 +290,16 @@ private fun OverviewScreen(
     onCalendarModeChange: (Boolean) -> Unit,
     calendarMonth: YearMonth,
     onCalendarMonthChange: (YearMonth) -> Unit,
-    onAdd: () -> Unit,
+    onAddMeal: () -> Unit,
+    onAddSymptom: () -> Unit,
     onOpenDay: (LocalDate) -> Unit,
     onEdit: (Entry) -> Unit,
     onData: () -> Unit,
     onSettings: () -> Unit
 ) {
     val context = LocalContext.current
+    var menuOpen by remember { mutableStateOf(false) }
+    var addOpen by remember { mutableStateOf(false) }
     // Berechtigungen können in den Systemeinstellungen geändert werden. Beim Zurückkommen wird neu geprüft.
     val lifecycleOwner = LocalLifecycleOwner.current
     var resumeTick by remember { mutableStateOf(0) }
@@ -286,8 +324,30 @@ private fun OverviewScreen(
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = onAdd) {
-                Icon(Icons.Filled.Add, contentDescription = "Eintrag hinzufügen")
+            Box {
+                FloatingActionButton(
+                    onClick = { addOpen = true },
+                    containerColor = Palette.Peach,
+                    contentColor = Palette.Ink
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Eintrag hinzufügen")
+                }
+                DropdownMenu(expanded = addOpen, onDismissRequest = { addOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Mahlzeit eintragen") },
+                        onClick = {
+                            addOpen = false
+                            onAddMeal()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Beschwerden eintragen") },
+                        onClick = {
+                            addOpen = false
+                            onAddSymptom()
+                        }
+                    )
+                }
             }
         }
     ) { padding ->
@@ -300,20 +360,39 @@ private fun OverviewScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "FooDiary",
+                    "Bekömmlich",
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f)
                 )
-                OutlinedButton(onClick = onData) {
-                    Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Meine Daten")
-                }
-                Spacer(Modifier.width(8.dp))
-                OutlinedButton(onClick = onSettings) {
-                    Icon(Icons.Filled.Notifications, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Erinnerungen")
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Filled.Person, contentDescription = "Profil")
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Meine Daten") },
+                            leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
+                            onClick = {
+                                menuOpen = false
+                                onData()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Erinnerungen") },
+                            leadingIcon = { Icon(Icons.Filled.Notifications, contentDescription = null) },
+                            onClick = {
+                                menuOpen = false
+                                onSettings()
+                            }
+                        )
+                        HorizontalDivider()
+                        Text(
+                            appVersionLabel(context),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
                 }
             }
 
@@ -326,10 +405,10 @@ private fun OverviewScreen(
                         Text("Erinnerungen sind eingeschränkt", style = MaterialTheme.typography.titleSmall)
                         if (!notificationsOn) {
                             Text(
-                                "Benachrichtigungen für FooDiary sind aus. Du bekommst keine Erinnerungen.",
+                                "Benachrichtigungen für Bekömmlich sind aus. Du bekommst keine Erinnerungen.",
                                 style = MaterialTheme.typography.bodyMedium
                             )
-                            Button(onClick = {
+                            Button(colors = peachButtonColors(), onClick = {
                                 context.startActivity(
                                     Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                                         .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
@@ -341,7 +420,7 @@ private fun OverviewScreen(
                                 "Exakte Erinnerungen sind nicht erlaubt. Sie kommen dann eventuell etwas später.",
                                 style = MaterialTheme.typography.bodyMedium
                             )
-                            Button(onClick = {
+                            Button(colors = peachButtonColors(), onClick = {
                                 context.startActivity(
                                     Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
                                         .setData(Uri.parse("package:${context.packageName}"))
@@ -356,12 +435,14 @@ private fun OverviewScreen(
                 FilterChip(
                     selected = !calendarMode,
                     onClick = { onCalendarModeChange(false) },
-                    label = { Text("Liste") }
+                    label = { Text("Liste") },
+                    leadingIcon = { Icon(Icons.Filled.List, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
                 FilterChip(
                     selected = calendarMode,
                     onClick = { onCalendarModeChange(true) },
-                    label = { Text("Kalender") }
+                    label = { Text("Kalender") },
+                    leadingIcon = { Icon(Icons.Filled.DateRange, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
             }
 
@@ -383,8 +464,8 @@ private fun OverviewScreen(
                                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Text("So startest du", style = MaterialTheme.typography.titleSmall)
                                     Text(
-                                        "Tippe unten auf +, um deine erste Mahlzeit zu notieren. " +
-                                            "Zu deinen Erinnerungszeiten fragt FooDiary außerdem nach, was du gegessen hast.",
+                                        "Tippe unten auf +, um eine Mahlzeit oder Beschwerden zu notieren. " +
+                                            "Zu deinen Erinnerungszeiten fragt Bekömmlich außerdem nach, was du gegessen hast.",
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                 }
@@ -418,11 +499,12 @@ private fun DayScreen(
     entries: List<Entry>,
     onBack: () -> Unit,
     onEdit: (Entry) -> Unit,
-    onAdd: () -> Unit
+    onAddMeal: () -> Unit,
+    onAddSymptom: () -> Unit
 ) {
     val status = dayStatus(entries)
     val statusText = when (status) {
-        DayStatus.COMPLETE -> "Vollständig: Frühstück, Mittag und Abendessen mit Befinden erfasst."
+        DayStatus.COMPLETE -> "Vollständig: Frühstück, Mittag und Abendessen erfasst."
         DayStatus.PARTIAL -> "Teilweise erfasst."
         DayStatus.EMPTY -> "Noch nichts erfasst."
     }
@@ -449,14 +531,20 @@ private fun DayScreen(
                 EntryCard(entry) { onEdit(entry) }
             }
         }
-        Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) {
-            Text("Eintrag für diesen Tag hinzufügen")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(colors = peachButtonColors(), onClick = onAddMeal, modifier = Modifier.weight(1f)) {
+                Text("Mahlzeit")
+            }
+            OutlinedButton(onClick = onAddSymptom, modifier = Modifier.weight(1f)) {
+                Text("Beschwerden")
+            }
         }
     }
 }
 
 @Composable
 private fun EntryCard(entry: Entry, onClick: () -> Unit) {
+    val symptomEntry = entry.mealType == null
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -464,11 +552,11 @@ private fun EntryCard(entry: Entry, onClick: () -> Unit) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
-                    color = entry.mealType?.color() ?: Palette.Cream,
+                    color = entry.mealType?.color() ?: Palette.LavenderDeep,
                     shape = MaterialTheme.shapes.small
                 ) {
                     Text(
-                        entry.mealType?.label ?: "Nur Befinden",
+                        entry.mealType?.label ?: "Beschwerden",
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                         style = MaterialTheme.typography.labelMedium
                     )
@@ -480,217 +568,27 @@ private fun EntryCard(entry: Entry, onClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            entry.mealText?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
-            val extras = listOfNotNull(
-                if (entry.kaffee) "Kaffee" else null,
-                if (entry.alkohol) "Alkohol" else null
-            )
-            if (extras.isNotEmpty()) {
-                Text("Dazu: ${extras.joinToString(", ")}", style = MaterialTheme.typography.bodyMedium)
+            val summary = entry.symptomSummary()
+            if (symptomEntry) {
+                Text(summary ?: "Ohne Angabe", style = MaterialTheme.typography.bodyLarge)
+            } else {
+                entry.mealText?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
+                val extras = listOfNotNull(
+                    if (entry.kaffee) "Kaffee" else null,
+                    if (entry.alkohol) "Alkohol" else null
+                )
+                if (extras.isNotEmpty()) {
+                    Text("Dazu: ${extras.joinToString(", ")}", style = MaterialTheme.typography.bodyMedium)
+                }
+                summary?.let { Text("Beschwerden: $it", style = MaterialTheme.typography.bodyMedium) }
             }
             entry.wellbeing?.let {
                 Text("Befinden: $it/10", style = MaterialTheme.typography.bodyMedium)
             }
             entry.complaints?.let {
-                Text("Beschwerden: $it", style = MaterialTheme.typography.bodyMedium)
+                Text("Notiz: $it", style = MaterialTheme.typography.bodyMedium)
             }
         }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun EditScreen(
-    dao: EntryDao,
-    existing: Entry?,
-    slot: Slot?,
-    day: LocalDate?,
-    onClose: () -> Unit
-) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val today = LocalDate.now()
-    val showRelative = (existing?.dayDate() ?: day ?: today) == today
-
-    var mealType by remember { mutableStateOf(existing?.mealType ?: slot?.mealType) }
-    var text by remember { mutableStateOf(existing?.mealText.orEmpty()) }
-    var kaffee by remember { mutableStateOf(existing?.kaffee ?: false) }
-    var alkohol by remember { mutableStateOf(existing?.alkohol ?: false) }
-    var eatenAt by remember {
-        mutableStateOf<Long?>(if (existing != null) existing.eatenAt else defaultEatenAt(day))
-    }
-    // Befinden wird nur gespeichert, wenn der Nutzer es bewusst setzt. Sonst bliebe ein Standardwert in den Daten.
-    var rated by remember { mutableStateOf(existing?.wellbeing != null) }
-    var wellbeing by remember { mutableStateOf((existing?.wellbeing ?: 5).toFloat()) }
-    var complaints by remember { mutableStateOf(existing?.complaints.orEmpty()) }
-    var confirmDelete by remember { mutableStateOf(false) }
-
-    val hasContent = text.isNotBlank() || kaffee || alkohol || complaints.isNotBlank() || rated
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        TextButton(onClick = onClose) {
-            Icon(Icons.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(4.dp))
-            Text("Zurück")
-        }
-        Text(
-            if (existing == null) "Neuer Eintrag" else "Eintrag bearbeiten",
-            style = MaterialTheme.typography.headlineSmall
-        )
-
-        Text("Mahlzeit", style = MaterialTheme.typography.labelLarge)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            MealType.entries.forEach { m ->
-                FilterChip(
-                    selected = mealType == m,
-                    onClick = { mealType = if (mealType == m) null else m },
-                    label = { Text(m.label) }
-                )
-            }
-        }
-
-        Text(mealType?.question ?: "Was hast du gegessen?", style = MaterialTheme.typography.titleMedium)
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("z. B. Spaghetti Carbonara, kleine Portion") },
-            minLines = 2
-        )
-
-        Text("Gab es dazu?", style = MaterialTheme.typography.labelLarge)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = kaffee, onClick = { kaffee = !kaffee }, label = { Text("Kaffee") })
-            FilterChip(selected = alkohol, onClick = { alkohol = !alkohol }, label = { Text("Alkohol") })
-        }
-
-        Text(
-            "Gegessen um ${eatenAt?.toDateTime() ?: "–"}",
-            style = MaterialTheme.typography.bodyMedium
-        )
-        // Zeigt, zu welchem Tag der Eintrag im Kalender zählt. Wichtig bei Zeiten nach Mitternacht.
-        val entryDay = eatenAt?.logicalDay() ?: day ?: today
-        Text(
-            "Gehört zum Tag: ${entryDay.format(dayShortFormat)}",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (showRelative) {
-                AssistChip(onClick = { eatenAt = System.currentTimeMillis() }, label = { Text("Jetzt") })
-                AssistChip(
-                    onClick = { eatenAt = System.currentTimeMillis() - 30 * 60_000L },
-                    label = { Text("vor 30 Min") }
-                )
-                AssistChip(
-                    onClick = { eatenAt = System.currentTimeMillis() - 60 * 60_000L },
-                    label = { Text("vor 1 Std") }
-                )
-                AssistChip(
-                    onClick = { eatenAt = System.currentTimeMillis() - 120 * 60_000L },
-                    label = { Text("vor 2 Std") }
-                )
-            }
-            AssistChip(
-                onClick = {
-                    pickDateTime(context, eatenAt ?: defaultEatenAt(day)) { eatenAt = it }
-                },
-                label = { Text("Uhrzeit") }
-            )
-        }
-
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Wie ging es dir danach?", style = MaterialTheme.typography.titleMedium)
-                FilterChip(
-                    selected = rated,
-                    onClick = { rated = !rated },
-                    label = { Text("Befinden erfassen") }
-                )
-                if (rated) {
-                    Text(
-                        "${wellbeing.roundToInt()} / 10",
-                        style = MaterialTheme.typography.headlineMedium,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center
-                    )
-                    Slider(
-                        value = wellbeing,
-                        onValueChange = { wellbeing = it },
-                        valueRange = 1f..10f,
-                        steps = 8
-                    )
-                } else {
-                    Text(
-                        "Nicht bewertet. Aktiviere „Befinden erfassen“, um einen Wert zu setzen.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-                OutlinedTextField(
-                    value = complaints,
-                    onValueChange = { complaints = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Beschwerden (optional)") },
-                    placeholder = { Text("z. B. Bauchgrummeln, Müdigkeit") }
-                )
-            }
-        }
-
-        Button(
-            onClick = {
-                val now = System.currentTimeMillis()
-                val entry = Entry(
-                    id = existing?.id ?: 0L,
-                    recordedAt = existing?.recordedAt ?: now,
-                    mealType = mealType,
-                    mealText = text.trim().ifBlank { null },
-                    eatenAt = eatenAt,
-                    wellbeing = if (rated) wellbeing.roundToInt() else null,
-                    complaints = complaints.trim().ifBlank { null },
-                    kaffee = kaffee,
-                    alkohol = alkohol,
-                    updatedAt = if (existing != null) now else null
-                )
-                scope.launch {
-                    if (existing == null) dao.insert(entry) else dao.update(entry)
-                    onClose()
-                }
-            },
-            enabled = hasContent,
-            modifier = Modifier.fillMaxWidth()
-        ) { Text("Speichern") }
-
-        if (existing != null) {
-            TextButton(onClick = { confirmDelete = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("Eintrag löschen")
-            }
-        }
-    }
-
-    if (confirmDelete && existing != null) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text("Eintrag löschen?") },
-            text = { Text("Der Eintrag wird dauerhaft entfernt.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDelete = false
-                    scope.launch {
-                        dao.delete(existing)
-                        onClose()
-                    }
-                }) { Text("Löschen") }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text("Abbrechen") }
-            }
-        )
     }
 }
 
@@ -710,7 +608,7 @@ private fun SettingsScreen(prefs: ReminderPrefs, onBack: () -> Unit) {
         }
         Text("Erinnerungen", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Zu diesen Zeiten erinnert dich FooDiary an deine Mahlzeiten.",
+            "Zu diesen Zeiten erinnert dich Bekömmlich an deine Mahlzeiten.",
             style = MaterialTheme.typography.bodyMedium
         )
         Slot.entries.forEach { slot ->
@@ -777,8 +675,8 @@ private fun DataScreen(dao: EntryDao, onBack: () -> Unit) {
                     "Alle Einträge als CSV-Datei speichern, zum Beispiel für eine Auswertung.",
                     style = MaterialTheme.typography.bodyMedium
                 )
-                Button(
-                    onClick = { exportLauncher.launch("foodiary-export.csv") },
+                Button(colors = peachButtonColors(), 
+                    onClick = { exportLauncher.launch("bekoemmlich-export.csv") },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Daten exportieren (CSV)") }
             }
@@ -810,6 +708,13 @@ private fun DataScreen(dao: EntryDao, onBack: () -> Unit) {
                 }
             }
         }
+        Text(
+            appVersionLabel(context),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
     }
 
     if (confirmDelete) {

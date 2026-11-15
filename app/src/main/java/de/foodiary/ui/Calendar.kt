@@ -41,13 +41,13 @@ fun Long.logicalDay(): LocalDate =
 fun Entry.dayDate(): LocalDate = (eatenAt ?: recordedAt).logicalDay()
 
 /**
- * Vollständig = Frühstück, Mittag und Abendessen sind jeweils mit bewusst gesetztem Befinden erfasst.
+ * Vollständig = Frühstück, Mittag und Abendessen sind erfasst.
  * Teilweise = irgendetwas ist erfasst. Leer = nichts.
  */
 fun dayStatus(entries: List<Entry>): DayStatus {
     if (entries.isEmpty()) return DayStatus.EMPTY
     val mains = listOf(MealType.FRUEHSTUECK, MealType.MITTAG, MealType.ABEND)
-    val complete = mains.all { main -> entries.any { it.mealType == main && it.wellbeing != null } }
+    val complete = mains.all { main -> entries.any { it.mealType == main } }
     return if (complete) DayStatus.COMPLETE else DayStatus.PARTIAL
 }
 

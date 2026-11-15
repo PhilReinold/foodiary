@@ -1,6 +1,7 @@
 package de.foodiary.ui
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -40,8 +41,9 @@ fun MealType.color(): Color = when (this) {
 }
 
 private val FoodiaryScheme = lightColorScheme(
-    primary = Palette.Peach,
-    onPrimary = Palette.Ink,
+    // Primary ist Tinte: Text- und Outline-Buttons bleiben so lesbar. Gefüllte Buttons nutzen peachButtonColors().
+    primary = Palette.Ink,
+    onPrimary = Palette.Surface200,
     primaryContainer = Palette.Peach,
     onPrimaryContainer = Palette.Ink,
     secondary = Palette.LavenderDeep,
@@ -56,7 +58,23 @@ private val FoodiaryScheme = lightColorScheme(
     onSurface = Palette.Ink,
     surfaceVariant = Palette.Cream,
     onSurfaceVariant = Palette.InkMuted,
-    outline = Palette.Outline
+    outline = Palette.Outline,
+    // Karten und Flächen bleiben cremefarben, ohne M3-Tönung aus Lavendel.
+    surfaceContainerLowest = Palette.Surface200,
+    surfaceContainerLow = Palette.Surface200,
+    surfaceContainer = Palette.Cream,
+    surfaceContainerHigh = Palette.Cream,
+    surfaceContainerHighest = Palette.Cream,
+    surfaceBright = Palette.Surface200,
+    surfaceDim = Palette.Surface100,
+    surfaceTint = Color.Transparent
+)
+
+/** Gefüllter Button im Design: Pfirsich mit Tinte. */
+@Composable
+fun peachButtonColors() = ButtonDefaults.buttonColors(
+    containerColor = Palette.Peach,
+    contentColor = Palette.Ink
 )
 
 /** Radien laut Design-System: Chips 6 dp, Karten und Eingabefelder 16 dp. */

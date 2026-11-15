@@ -1,4 +1,4 @@
-# FooDiary
+# Bekömmlich
 
 Ernährungstagebuch für Android. Mahlzeiten und Befinden werden lokal auf dem Gerät gespeichert, der CSV-Export passiert nur auf Wunsch.
 
@@ -20,7 +20,7 @@ Ernährungstagebuch für Android. Mahlzeiten und Befinden werden lokal auf dem G
 ## Berechtigungen auf dem Handy
 
 - Benachrichtigungen: beim ersten Start abfragen.
-- Exakte Alarme: ab Android 12 muss man sie unter „Apps → FooDiary → Wecker und Erinnerungen“ erlauben. Ohne diese Erlaubnis kommen Erinnerungen ungefähr zur Zeit, nicht exakt.
+- Exakte Alarme: ab Android 12 muss man sie unter „Apps → Bekömmlich → Wecker und Erinnerungen“ erlauben. Ohne diese Erlaubnis kommen Erinnerungen ungefähr zur Zeit, nicht exakt.
 - Akku-Optimierung: für zuverlässige Erinnerungen „Uneingeschränkt“ einstellen.
 
 ## Datenschutz

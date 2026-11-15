@@ -27,6 +27,9 @@ val MealType.question: String
  * mealType = null bedeutet: nur Befinden erfasst.
  * mealText bleibt unverändert, Auswertung erfolgt später extern.
  * updatedAt ist gesetzt, sobald der Eintrag nachträglich bearbeitet wurde.
+ * mealType = null bedeutet seit Version 3: reiner Beschwerden-Eintrag, eatenAt ist dann der Zeitpunkt der Beschwerden.
+ * symptoms ist eine kommagetrennte Liste, severity die Stärke von 1 bis 5. complaints dient als freie Notiz.
+ * wellbeing (1 bis 10) stammt aus älteren Versionen und wird nicht mehr neu erfasst.
  */
 @Entity(tableName = "entries")
 data class Entry(
@@ -39,5 +42,7 @@ data class Entry(
     val complaints: String?,
     @ColumnInfo(defaultValue = "0") val kaffee: Boolean = false,
     @ColumnInfo(defaultValue = "0") val alkohol: Boolean = false,
-    val updatedAt: Long? = null
+    val updatedAt: Long? = null,
+    val symptoms: String? = null,
+    val severity: Int? = null
 )

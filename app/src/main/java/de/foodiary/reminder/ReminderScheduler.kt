@@ -68,7 +68,7 @@ object ReminderScheduler {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_edit)
-            .setContentTitle("FooDiary · ${slot.label}")
+            .setContentTitle("Bekömmlich · ${slot.label}")
             .setContentText(slot.question)
             .setContentIntent(contentIntent)
             .setAutoCancel(true)

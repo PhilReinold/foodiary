@@ -13,8 +13,9 @@ android {
         applicationId = "de.foodiary"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // Build-Nummer kommt aus GitHub Actions, lokal ist sie 1. So ist jede Test-APK unterscheidbar.
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+        versionName = "0.2.0"
     }
 
     buildTypes {
