@@ -18,6 +18,18 @@ android {
         versionName = "0.2.0"
     }
 
+    // Fester Test-Schlüssel im Repo. Ohne ihn signiert jeder GitHub-Build mit einem neuen Schlüssel,
+    // und Android verweigert dann das Update über eine bereits installierte Version.
+    // Nur für Test-APKs gedacht, nicht für eine Veröffentlichung im Store.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
