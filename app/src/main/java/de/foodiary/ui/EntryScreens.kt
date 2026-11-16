@@ -52,7 +52,7 @@ import kotlin.math.sin
 import kotlinx.coroutines.launch
 
 /** Auswählbare Beschwerden. Alles Weitere geht über die Notiz. */
-internal val SYMPTOMS = listOf("Bauch", "Kopf", "Übelkeit", "Müdigkeit", "Haut")
+internal val SYMPTOMS = listOf("Bauch", "Kopf", "Müdigkeit", "Haut")
 
 internal fun severityWord(severity: Int): String = when (severity) {
     1 -> "leicht"
@@ -188,13 +188,10 @@ private fun SymptomBlock(
 ) {
     val any = selected.isNotEmpty()
     val value = severity ?: 2
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Pill("Keine", !any, Palette.Lavender, height = 30.dp) { onChange(emptySet(), null) }
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+        Pill("Keine", !any, Palette.Lavender, modifier = Modifier.weight(1f), height = 30.dp, horizontalPadding = 4.dp) { onChange(emptySet(), null) }
         SYMPTOMS.forEach { symptom ->
-            Pill(symptom, symptom in selected, Palette.SoftRed, height = 30.dp) {
+            Pill(symptom, symptom in selected, Palette.SoftRed, modifier = Modifier.weight(1f), height = 30.dp, horizontalPadding = 4.dp) {
                 val next = if (symptom in selected) selected - symptom else selected + symptom
                 onChange(next, if (next.isEmpty()) null else value)
             }
@@ -461,7 +458,14 @@ internal fun EditScreen(
                             .padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Was hast du gegessen?", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            when (meal) {
+                                MealType.FRUEHSTUECK -> "Was gab es zum Frühstück?"
+                                MealType.MITTAG -> "Was gab es zum Mittagessen?"
+                                MealType.ABEND -> "Was gab es zum Abendessen?"
+                                MealType.SNACK -> "Was gab es als Snack?"
+                            },
+                            style = MaterialTheme.typography.titleMedium)
                         PlainField(
                             value = text,
                             onValueChange = { text = it },

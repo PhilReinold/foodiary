@@ -14,6 +14,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import de.foodiary.MainActivity
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -66,13 +67,18 @@ object ReminderScheduler {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_edit)
             .setContentTitle("Bekömmlich · ${slot.label}")
             .setContentText(slot.question)
             .setContentIntent(contentIntent)
             .setAutoCancel(true)
-            .build()
+        if (slot == Slot.SNACK) {
+            // Der optionale Snack-Check verfällt um Mitternacht.
+            val midnight = LocalDate.now().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            builder.setTimeoutAfter((midnight - System.currentTimeMillis()).coerceAtLeast(1))
+        }
+        val notification = builder.build()
 
         NotificationManagerCompat.from(context).notify(slot.ordinal, notification)
     }
