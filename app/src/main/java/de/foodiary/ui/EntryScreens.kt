@@ -445,7 +445,7 @@ internal fun EditScreen(
                     colors = CardDefaults.cardColors(containerColor = whenColor)
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Welche Mahlzeit, und wann?", style = MaterialTheme.typography.titleMedium)
+                        Text(if (existing == null) "Neuer Eintrag" else "Eintrag bearbeiten", style = MaterialTheme.typography.titleMedium)
                         SunArc(
                             meal = meal,
                             onSelect = {
