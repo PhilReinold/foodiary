@@ -111,18 +111,43 @@ private fun pickMinutes(context: Context, current: Int, onPicked: (Int) -> Unit)
 
 internal fun pickDateTime(context: Context, base: Long, onPicked: (Long) -> Unit) {
     val cal = java.util.Calendar.getInstance().apply { timeInMillis = base }
-    TimePickerDialog(
+    // Erst das Datum (nicht in der Zukunft), danach die Uhrzeit.
+    val dateDialog = android.app.DatePickerDialog(
         context,
-        { _, hour, minute ->
-            cal.set(java.util.Calendar.HOUR_OF_DAY, hour)
-            cal.set(java.util.Calendar.MINUTE, minute)
-            cal.set(java.util.Calendar.SECOND, 0)
-            onPicked(cal.timeInMillis)
+        { _, year, month, day ->
+            cal.set(year, month, day)
+            TimePickerDialog(
+                context,
+                { _, hour, minute ->
+                    cal.set(java.util.Calendar.HOUR_OF_DAY, hour)
+                    cal.set(java.util.Calendar.MINUTE, minute)
+                    cal.set(java.util.Calendar.SECOND, 0)
+                    cal.set(java.util.Calendar.MILLISECOND, 0)
+                    onPicked(minOf(cal.timeInMillis, System.currentTimeMillis()))
+                },
+                cal.get(java.util.Calendar.HOUR_OF_DAY),
+                cal.get(java.util.Calendar.MINUTE),
+                true
+            ).show()
         },
-        cal.get(java.util.Calendar.HOUR_OF_DAY),
-        cal.get(java.util.Calendar.MINUTE),
-        true
-    ).show()
+        cal.get(java.util.Calendar.YEAR),
+        cal.get(java.util.Calendar.MONTH),
+        cal.get(java.util.Calendar.DAY_OF_MONTH)
+    )
+    dateDialog.datePicker.maxDate = System.currentTimeMillis()
+    dateDialog.show()
+}
+
+/** "Heute, 14:00", "Gestern, 23:50" oder "Mo., 10. Nov., 14:00". */
+internal fun Long.toDayAndTime(): String {
+    val date = java.time.Instant.ofEpochMilli(this).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+    val today = java.time.LocalDate.now()
+    val day = when (date) {
+        today -> "Heute"
+        today.minusDays(1) -> "Gestern"
+        else -> date.format(DateTimeFormatter.ofPattern("EEE, d. MMM", Locale.GERMAN))
+    }
+    return "$day, ${toTime()} Uhr"
 }
 
 @Composable

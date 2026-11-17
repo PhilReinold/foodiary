@@ -235,35 +235,22 @@ private fun TimeRow(
     onPick: (String, Long) -> Unit
 ) {
     val context = LocalContext.current
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (relative) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("now" to 0, "30" to 30, "60" to 60, "120" to 120).forEach { (key, minutes) ->
-                    Pill(
-                        label = when (key) {
-                            "now" -> "Jetzt"
-                            "30" -> "vor 30 Min"
-                            "60" -> "vor 1 Std"
-                            else -> "vor 2 Std"
-                        },
-                        selected = selection == key,
-                        selectedColor = Palette.Ink,
-                        modifier = Modifier.weight(1f),
-                        height = 36.dp,
-                        horizontalPadding = 2.dp,
-                        selectedTextColor = Palette.Surface200,
-                        fontSize = 12.sp
-                    ) { onPick(key, System.currentTimeMillis() - minutes * 60_000L) }
-                }
-            }
-        }
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Pill(
-            label = if (selection == "custom") "Genaue Uhrzeit: ${time.toTime()} Uhr (ändern)"
-            else "Genaue Uhrzeit wählen (${time.toTime()} Uhr)",
+            label = "Jetzt",
+            selected = selection == "now",
+            selectedColor = Palette.Ink,
+            modifier = Modifier.weight(0.8f),
+            height = 40.dp,
+            horizontalPadding = 2.dp,
+            selectedTextColor = Palette.Surface200
+        ) { onPick("now", System.currentTimeMillis()) }
+        Pill(
+            label = if (selection == "custom") time.toDayAndTime() else "Datum & Uhrzeit wählen",
             selected = selection == "custom",
             selectedColor = Palette.Ink,
-            modifier = Modifier.fillMaxWidth(),
-            height = 36.dp,
+            modifier = Modifier.weight(2f),
+            height = 40.dp,
             horizontalPadding = 8.dp,
             selectedTextColor = Palette.Surface200
         ) { pickDateTime(context, time) { onPick("custom", it) } }
@@ -446,7 +433,7 @@ internal fun EditScreen(
 
         BoxWithConstraints(modifier = Modifier.weight(1f)) {
             // Passt alles auf den Bildschirm, füllt die erste Karte den Rest. Sonst wird gescrollt.
-            val fits = maxHeight >= 650.dp
+            val fits = maxHeight >= 610.dp
             Column(
                 modifier = Modifier
                     .fillMaxSize()
