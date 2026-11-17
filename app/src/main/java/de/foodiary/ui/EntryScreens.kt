@@ -190,9 +190,9 @@ private fun SymptomBlock(
     val any = selected.isNotEmpty()
     val value = severity ?: 2
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-        Pill("Keine", !any, Palette.Lavender, modifier = Modifier.weight(1f), height = 30.dp, horizontalPadding = 4.dp) { onChange(emptySet(), null) }
+        Pill("Keine", !any, Palette.Lavender, modifier = Modifier.weight(0.85f), height = 30.dp, horizontalPadding = 2.dp, fontSize = 12.sp) { onChange(emptySet(), null) }
         SYMPTOMS.forEach { symptom ->
-            Pill(symptom, symptom in selected, Palette.SoftRed, modifier = Modifier.weight(1f), height = 30.dp, horizontalPadding = 4.dp) {
+            Pill(symptom, symptom in selected, Palette.SoftRed, modifier = Modifier.weight(if (symptom == "Müdigkeit") 1.4f else 0.85f), height = 30.dp, horizontalPadding = 2.dp, fontSize = 12.sp) {
                 val next = if (symptom in selected) selected - symptom else selected + symptom
                 onChange(next, if (next.isEmpty()) null else value)
             }
