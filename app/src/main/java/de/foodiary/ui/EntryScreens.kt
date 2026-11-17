@@ -103,6 +103,7 @@ private fun Pill(
     height: Dp = 32.dp,
     horizontalPadding: Dp = 12.dp,
     selectedTextColor: Color = Palette.Ink,
+    fontSize: androidx.compose.ui.unit.TextUnit = 13.sp,
     onClick: () -> Unit
 ) {
     val shape = RoundedCornerShape(50)
@@ -118,7 +119,7 @@ private fun Pill(
     ) {
         Text(
             label,
-            style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = fontSize),
             color = if (selected) selectedTextColor else Palette.Ink,
             maxLines = 1
         )
@@ -234,31 +235,36 @@ private fun TimeRow(
     onPick: (String, Long) -> Unit
 ) {
     val context = LocalContext.current
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (relative) {
-            listOf("now" to 0, "30" to 30, "60" to 60).forEach { (key, minutes) ->
-                Pill(
-                    label = when (key) {
-                        "now" -> "Jetzt"
-                        "30" -> "vor 30 Min"
-                        else -> "vor 1 Std"
-                    },
-                    selected = selection == key,
-                    selectedColor = Palette.Ink,
-                    modifier = Modifier.weight(1f),
-                    height = 36.dp,
-                    horizontalPadding = 2.dp,
-                    selectedTextColor = Palette.Surface200
-                ) { onPick(key, System.currentTimeMillis() - minutes * 60_000L) }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("now" to 0, "30" to 30, "60" to 60, "120" to 120).forEach { (key, minutes) ->
+                    Pill(
+                        label = when (key) {
+                            "now" -> "Jetzt"
+                            "30" -> "vor 30 Min"
+                            "60" -> "vor 1 Std"
+                            else -> "vor 2 Std"
+                        },
+                        selected = selection == key,
+                        selectedColor = Palette.Ink,
+                        modifier = Modifier.weight(1f),
+                        height = 36.dp,
+                        horizontalPadding = 2.dp,
+                        selectedTextColor = Palette.Surface200,
+                        fontSize = 12.sp
+                    ) { onPick(key, System.currentTimeMillis() - minutes * 60_000L) }
+                }
             }
         }
         Pill(
-            label = "${time.toTime()} Uhr",
+            label = if (selection == "custom") "Genaue Uhrzeit: ${time.toTime()} Uhr (ändern)"
+            else "Genaue Uhrzeit wählen (${time.toTime()} Uhr)",
             selected = selection == "custom",
             selectedColor = Palette.Ink,
-            modifier = Modifier.weight(1.15f),
+            modifier = Modifier.fillMaxWidth(),
             height = 36.dp,
-            horizontalPadding = 2.dp,
+            horizontalPadding = 8.dp,
             selectedTextColor = Palette.Surface200
         ) { pickDateTime(context, time) { onPick("custom", it) } }
     }
@@ -440,7 +446,7 @@ internal fun EditScreen(
 
         BoxWithConstraints(modifier = Modifier.weight(1f)) {
             // Passt alles auf den Bildschirm, füllt die erste Karte den Rest. Sonst wird gescrollt.
-            val fits = maxHeight >= 610.dp
+            val fits = maxHeight >= 650.dp
             Column(
                 modifier = Modifier
                     .fillMaxSize()
