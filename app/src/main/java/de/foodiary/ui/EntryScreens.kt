@@ -441,6 +441,32 @@ internal fun EditScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = whenColor)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Welche Mahlzeit, und wann?", style = MaterialTheme.typography.titleMedium)
+                        SunArc(
+                            meal = meal,
+                            onSelect = {
+                                meal = it
+                                mealTouched = true
+                            },
+                            onSnack = {
+                                meal = if (meal == MealType.SNACK) mealFor(eatenAt) else MealType.SNACK
+                                mealTouched = true
+                            }
+                        )
+                        TimeRow(time = eatenAt, selection = timeSelection, relative = relative) { key, picked ->
+                            timeSelection = key
+                            eatenAt = picked
+                            if (!mealTouched) meal = mealFor(picked)
+                        }
+                    }
+                }
+
+
+                Card(
                     modifier = Modifier.fillMaxWidth().then(if (fits) Modifier.weight(1f) else Modifier),
                     colors = CardDefaults.cardColors(containerColor = Palette.Surface200)
                 ) {
@@ -478,31 +504,6 @@ internal fun EditScreen(
                             )
                             Pill("Kaffee", kaffee, Palette.Lavender, height = 30.dp) { kaffee = !kaffee }
                             Pill("Alkohol", alkohol, Palette.Lavender, height = 30.dp) { alkohol = !alkohol }
-                        }
-                    }
-                }
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = whenColor)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Wann war das?", style = MaterialTheme.typography.titleMedium)
-                        SunArc(
-                            meal = meal,
-                            onSelect = {
-                                meal = it
-                                mealTouched = true
-                            },
-                            onSnack = {
-                                meal = if (meal == MealType.SNACK) mealFor(eatenAt) else MealType.SNACK
-                                mealTouched = true
-                            }
-                        )
-                        TimeRow(time = eatenAt, selection = timeSelection, relative = relative) { key, picked ->
-                            timeSelection = key
-                            eatenAt = picked
-                            if (!mealTouched) meal = mealFor(picked)
                         }
                     }
                 }
