@@ -68,7 +68,7 @@ object ReminderScheduler {
         )
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_menu_edit)
+            .setSmallIcon(de.foodiary.R.drawable.ic_stat_logo)
             .setContentTitle("Bekömmlich · ${slot.label}")
             .setContentText(slot.question)
             .setContentIntent(contentIntent)
