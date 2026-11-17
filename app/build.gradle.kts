@@ -15,7 +15,7 @@ android {
         targetSdk = 35
         // Build-Nummer kommt aus GitHub Actions, lokal ist sie 1. So ist jede Test-APK unterscheidbar.
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
-        versionName = "0.2.7"
+        versionName = "0.2.8"
     }
 
     // Fester Test-Schlüssel im Repo. Ohne ihn signiert jeder GitHub-Build mit einem neuen Schlüssel,

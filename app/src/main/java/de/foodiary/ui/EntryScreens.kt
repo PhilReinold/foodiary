@@ -136,9 +136,16 @@ private fun PlainField(
     singleLine: Boolean = false
 ) {
     val shape = RoundedCornerShape(if (singleLine) 12.dp else 16.dp)
+    // TextFieldValue statt String: so behält die Tastatur Auswahl und Textmarkierung,
+    // und Löschen funktioniert zuverlässig (auch bei Vorschlägen und Autokorrektur).
+    var field by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(value)) }
+    if (field.text != value) field = androidx.compose.ui.text.input.TextFieldValue(value, androidx.compose.ui.text.TextRange(value.length))
     BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
+        value = field,
+        onValueChange = {
+            field = it
+            if (it.text != value) onValueChange(it.text)
+        },
         singleLine = singleLine,
         textStyle = MaterialTheme.typography.bodyLarge.copy(color = Palette.Ink),
         cursorBrush = SolidColor(Palette.Ink),
@@ -150,7 +157,7 @@ private fun PlainField(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         decorationBox = { inner ->
             Box(contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart) {
-                if (value.isEmpty()) {
+                if (field.text.isEmpty()) {
                     Text(
                         placeholder,
                         style = MaterialTheme.typography.bodyLarge,
